@@ -32,3 +32,14 @@ hdiutil create -volname "$APP_NAME" -srcfolder build/dmg -ov -format UDZO "$DMG"
 rm -rf build/dmg build/AppIcon.iconset
 
 echo "✓ Listo: $DMG"
+
+# ./build.sh --install: reemplaza la app en /Applications y la vuelve a abrir.
+if [[ "${1:-}" == "--install" ]]; then
+    echo "→ Instalando en /Applications…"
+    pkill -x ClaudeUsage || true
+    sleep 1
+    rm -rf "/Applications/$APP_NAME.app"
+    cp -R "$APP" /Applications/
+    open "/Applications/$APP_NAME.app"
+    echo "✓ Instalada y abierta"
+fi

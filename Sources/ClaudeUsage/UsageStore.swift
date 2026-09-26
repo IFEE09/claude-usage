@@ -50,6 +50,7 @@ final class UsageStore: ObservableObject {
                 await self?.refresh()
             }
         }
+        enableLaunchAtLoginOnFirstRun()
         Task { await refresh() }
     }
 
@@ -193,6 +194,17 @@ final class UsageStore: ObservableObject {
     }
 
     // MARK: Inicio automático
+
+    /// La primera vez que la app corre desde /Applications activa el inicio automático.
+    /// Después respeta lo que elijas en el menú.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didSetUpLaunchAtLogin"
+        guard !UserDefaults.standard.bool(forKey: key),
+              Bundle.main.bundlePath.hasPrefix("/Applications/")
+        else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if !launchAtLogin { launchAtLogin = true }
+    }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
         do {

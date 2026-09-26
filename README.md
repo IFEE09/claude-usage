@@ -10,6 +10,13 @@ App de barra de menús para macOS que muestra los límites de uso de tu cuenta d
 Genera `build/ClaudeUsage.dmg`. Ábrelo y arrastra **Claude Usage** a Aplicaciones.
 La primera vez: clic derecho → **Abrir** (la app no está firmada por Apple).
 
+Para compilar e instalar directo en /Applications:
+
+    ./build.sh --install
+
+La primera vez que se abre desde Aplicaciones se activa sola al iniciar sesión en el Mac;
+se puede desactivar desde el menú de la app.
+
 ## Cómo funciona
 
 - Inicias sesión en claude.ai dentro de la app; la sesión se guarda como en un navegador.
