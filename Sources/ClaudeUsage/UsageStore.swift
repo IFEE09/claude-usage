@@ -19,14 +19,20 @@ final class UsageStore: ObservableObject {
     @Published private(set) var status: Status = .idle
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var orgName: String?
-    @Published var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled {
-        didSet { setLaunchAtLogin(launchAtLogin) }
+    @Published var launchAtLogin: Bool = UsageStore.isLaunchAtLoginRegistered {
+        didSet {
+            guard !isSyncingLaunchAtLogin, launchAtLogin != oldValue else { return }
+            setLaunchAtLogin(launchAtLogin)
+        }
     }
 
     private let client = ClaudeClient()
     private var timer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var isRefreshing = false
+    private var isSyncingLaunchAtLogin = false
+    /// Aumenta al cerrar sesión para descartar una consulta que ya estaba en curso.
+    private var session = 0
     /// Intervalo actual del refresco adaptativo.
     private var interval = UsageStore.minInterval
     private lazy var loginWindow = LoginWindowController { [weak self] in
@@ -68,6 +74,7 @@ final class UsageStore: ObservableObject {
     func showLogin() { loginWindow.show() }
 
     func logout() async {
+        session += 1
         await client.logout()
         UserDefaults.standard.removeObject(forKey: Self.orgKey)
         limits = []
@@ -89,6 +96,7 @@ final class UsageStore: ObservableObject {
             scheduleNextRefresh()
         }
         status = .loading
+        let session = self.session
         let previous = Dictionary(uniqueKeysWithValues: limits.map { ($0.id, $0.percent) })
 
         do {
@@ -97,12 +105,25 @@ final class UsageStore: ObservableObject {
             guard let orgs = try await client.getJSON("/api/organizations") as? [[String: Any]] else {
                 throw ClaudeError.badResponse
             }
+            // Si ninguna organización da datos, se muestra el último error real en vez de uno genérico.
+            var lastError: Error = ClaudeError.noUsage
             for org in orderedOrganizations(orgs) {
-                guard let uuid = org["uuid"] as? String,
-                      let usage = try? await client.getJSON("/api/organizations/\(uuid)/usage") as? [String: Any]
-                else { continue }
+                guard let uuid = org["uuid"] as? String else { continue }
+                let usage: [String: Any]
+                do {
+                    guard let dict = try await client.getJSON("/api/organizations/\(uuid)/usage") as? [String: Any]
+                    else { continue }
+                    usage = dict
+                } catch ClaudeError.notLoggedIn {
+                    // Organizaciones sin página de uso (p. ej. solo API) responden 403.
+                    continue
+                } catch {
+                    lastError = error
+                    continue
+                }
                 let parsed = Self.parseLimits(usage)
                 if parsed.isEmpty { continue }
+                guard session == self.session else { return }
 
                 UserDefaults.standard.set(uuid, forKey: Self.orgKey)
                 let current = Dictionary(uniqueKeysWithValues: parsed.map { ($0.id, $0.percent) })
@@ -115,7 +136,9 @@ final class UsageStore: ObservableObject {
                 status = .ok
                 return
             }
-            throw ClaudeError.noUsage
+            throw lastError
+        } catch where session != self.session {
+            return
         } catch ClaudeError.notLoggedIn {
             limits = []
             status = .loggedOut
@@ -206,15 +229,29 @@ final class UsageStore: ObservableObject {
         if !launchAtLogin { launchAtLogin = true }
     }
 
+    /// "Pendiente de aprobación" cuenta como activado: ya está registrado y solo falta tu permiso.
+    private static var isLaunchAtLoginRegistered: Bool {
+        [.enabled, .requiresApproval].contains(SMAppService.mainApp.status)
+    }
+
     private func setLaunchAtLogin(_ enabled: Bool) {
+        let service = SMAppService.mainApp
         do {
             if enabled {
-                try SMAppService.mainApp.register()
+                try service.register()
             } else {
-                try SMAppService.mainApp.unregister()
+                try service.unregister()
             }
         } catch {
             status = .error("No se pudo cambiar el inicio automático: \(error.localizedDescription)")
         }
+        if enabled, service.status == .requiresApproval {
+            status = .error("Autoriza Claude Usage en Ajustes del Sistema → General → Ítems de inicio.")
+            SMAppService.openSystemSettingsLoginItems()
+        }
+        // Refleja el estado real para que la casilla no mienta si algo falló.
+        isSyncingLaunchAtLogin = true
+        launchAtLogin = Self.isLaunchAtLoginRegistered
+        isSyncingLaunchAtLogin = false
     }
 }

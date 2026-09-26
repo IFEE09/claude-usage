@@ -24,6 +24,10 @@ enum ClaudeError: LocalizedError {
 @MainActor
 final class ClaudeClient: NSObject, WKNavigationDelegate {
     static let baseURL = URL(string: "https://claude.ai")!
+    /// Segundos máximos por petición.
+    static let timeout: TimeInterval = 30
+    /// WKWebView no incluye "Safari" en su user agent por defecto y algunos proveedores de
+    /// login lo rechazan; este es el de Safari, que usa el mismo motor WebKit.
     static let userAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
@@ -62,19 +66,26 @@ final class ClaudeClient: NSObject, WKNavigationDelegate {
     func getJSON(_ path: String) async throws -> Any {
         try await ensureOrigin()
 
+        // Con tiempo límite: si fetch se queda colgado, la app nunca volvería a actualizar.
         let js = """
-        const r = await fetch(path, { credentials: 'include', headers: { 'accept': 'application/json' } });
+        const r = await fetch(path, {
+            credentials: 'include',
+            headers: { 'accept': 'application/json' },
+            signal: AbortSignal.timeout(timeoutMs)
+        });
         return { status: r.status, body: await r.text() };
         """
         let raw = try await webView.callAsyncJavaScript(
-            js, arguments: ["path": path], in: nil, contentWorld: .defaultClient
+            js, arguments: ["path": path, "timeoutMs": Self.timeout * 1000], in: nil, contentWorld: .defaultClient
         )
         guard let result = raw as? [String: Any],
               let status = (result["status"] as? NSNumber)?.intValue,
               let body = result["body"] as? String
         else { throw ClaudeError.badResponse }
 
-        if body.contains("Just a moment") || body.contains("cf-challenge") {
+        let json = body.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) }
+        // La página de verificación de Cloudflare es HTML; una respuesta JSON nunca lo es.
+        if json == nil, body.contains("Just a moment") || body.contains("cf-challenge") {
             originReady = false
             throw ClaudeError.blocked
         }
@@ -83,9 +94,7 @@ final class ClaudeClient: NSObject, WKNavigationDelegate {
         case 401, 403: throw ClaudeError.notLoggedIn
         default: throw ClaudeError.http(status)
         }
-        guard let data = body.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data)
-        else { throw ClaudeError.badResponse }
+        guard let json else { throw ClaudeError.badResponse }
         return json
     }
 
@@ -95,7 +104,10 @@ final class ClaudeClient: NSObject, WKNavigationDelegate {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             loadContinuation?.resume(throwing: CancellationError())
             loadContinuation = cont
-            webView.load(URLRequest(url: Self.baseURL.appendingPathComponent("api/organizations")))
+            webView.load(URLRequest(
+                url: Self.baseURL.appendingPathComponent("api/organizations"),
+                timeoutInterval: Self.timeout
+            ))
         }
         originReady = true
     }

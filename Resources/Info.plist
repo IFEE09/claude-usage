@@ -22,6 +22,8 @@
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 IFEE09 · Licencia Apache 2.0 · No afiliada a Anthropic</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

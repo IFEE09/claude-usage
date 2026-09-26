@@ -29,7 +29,12 @@ struct MenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            ForEach(store.limits) { LimitRow(limit: $0) }
+            // Redibuja cada 30 s para que la cuenta regresiva no se congele con el menú abierto.
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(store.limits) { LimitRow(limit: $0) }
+                }
+            }
 
             if let lastUpdated = store.lastUpdated {
                 Text(footer(lastUpdated))

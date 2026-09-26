@@ -1,4 +1,5 @@
-// Genera AppIcon.iconset: cuadrado redondeado color Claude con un medidor blanco.
+// Genera AppIcon.iconset: cuadrado redondeado color terracota con un medidor blanco.
+// El medidor se dibuja a mano: la licencia de SF Symbols no permite usarlos en íconos de apps.
 import AppKit
 
 let outDir = CommandLine.arguments[1]
@@ -18,13 +19,36 @@ func render(_ px: Int) -> Data {
     NSColor(srgbRed: 0.85, green: 0.47, blue: 0.34, alpha: 1).setFill()
     NSBezierPath(roundedRect: rect, xRadius: rect.width * 0.225, yRadius: rect.width * 0.225).fill()
 
-    let config = NSImage.SymbolConfiguration(pointSize: size * 0.42, weight: .semibold)
-        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-    if let symbol = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent", accessibilityDescription: nil)?
-        .withSymbolConfiguration(config) {
-        let s = symbol.size
-        symbol.draw(in: NSRect(x: (size - s.width) / 2, y: (size - s.height) / 2, width: s.width, height: s.height))
+    // Medidor: arco de 240° con marcas y una aguja apuntando a ~60 %.
+    let center = NSPoint(x: size / 2, y: size * 0.45)
+    let radius = size * 0.26
+    let lineWidth = size * 0.045
+    NSColor.white.set()
+
+    let arc = NSBezierPath()
+    arc.appendArc(withCenter: center, radius: radius, startAngle: 210, endAngle: -30, clockwise: true)
+    arc.lineWidth = lineWidth
+    arc.lineCapStyle = .round
+    arc.stroke()
+
+    for step in 0...4 {
+        let angle = (210 - CGFloat(step) * 60) * .pi / 180
+        let dot = radius * 0.72
+        let r = lineWidth * 0.55
+        let p = NSPoint(x: center.x + cos(angle) * dot, y: center.y + sin(angle) * dot)
+        NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)).fill()
     }
+
+    let needleAngle: CGFloat = 66 * .pi / 180
+    let needle = NSBezierPath()
+    needle.move(to: center)
+    needle.line(to: NSPoint(x: center.x + cos(needleAngle) * radius * 0.85,
+                            y: center.y + sin(needleAngle) * radius * 0.85))
+    needle.lineWidth = lineWidth
+    needle.lineCapStyle = .round
+    needle.stroke()
+    let hub = lineWidth * 1.1
+    NSBezierPath(ovalIn: NSRect(x: center.x - hub, y: center.y - hub, width: 2 * hub, height: 2 * hub)).fill()
 
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
