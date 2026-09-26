@@ -125,6 +125,14 @@ flowchart LR
   arranque automático.
 - ✅ Código 100 % abierto: puedes revisar cada línea.
 
+## 🔔 Extra opcional: notificaciones de Claude Code
+
+¿Usas Claude Code desde la Terminal de Mac? En
+**[IFEE09/mac-terminal-setup](https://github.com/IFEE09/mac-terminal-setup)** hay una
+configuración aparte que te manda una **notificación de macOS cada vez que Claude Code
+termina una tarea**, junto con un tema visual para la Terminal. No es parte de esta app:
+es un proyecto independiente que puedes instalar si quieres.
+
 ## 🗂️ Estructura del proyecto
 
 ```
