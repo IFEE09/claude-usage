@@ -40,6 +40,8 @@ struct MenuView: View {
                 Text(footer(lastUpdated))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             Divider()
@@ -67,10 +69,9 @@ struct MenuView: View {
         .task { await store.refreshIfStale() }
     }
 
+    /// Solo la hora: el nombre de la organización puede ser tu correo o el de tu empresa.
     private func footer(_ date: Date) -> String {
-        let time = date.formatted(date: .omitted, time: .shortened)
-        if let org = store.orgName { return "\(org) · actualizado \(time)" }
-        return "Actualizado \(time)"
+        "Actualizado \(date.formatted(date: .omitted, time: .shortened))"
     }
 }
 

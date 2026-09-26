@@ -18,7 +18,6 @@ final class UsageStore: ObservableObject {
     @Published private(set) var limits: [UsageLimit] = []
     @Published private(set) var status: Status = .idle
     @Published private(set) var lastUpdated: Date?
-    @Published private(set) var orgName: String?
     @Published var launchAtLogin: Bool = UsageStore.isLaunchAtLoginRegistered {
         didSet {
             guard !isSyncingLaunchAtLogin, launchAtLogin != oldValue else { return }
@@ -78,7 +77,6 @@ final class UsageStore: ObservableObject {
         await client.logout()
         UserDefaults.standard.removeObject(forKey: Self.orgKey)
         limits = []
-        orgName = nil
         lastUpdated = nil
         status = .loggedOut
     }
@@ -131,7 +129,6 @@ final class UsageStore: ObservableObject {
                     ? min(interval * 2, Self.maxInterval)
                     : Self.minInterval
                 limits = parsed
-                orgName = org["name"] as? String
                 lastUpdated = Date()
                 status = .ok
                 return
