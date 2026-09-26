@@ -166,6 +166,8 @@ de lucro**: úsala, compártela y mejórala con toda libertad.
 
 <div align="center">
 
-Hecho con ❤️ en México para la comunidad latina
+Hecho con ❤️ en México por **[Farid Espadas](https://github.com/IFEE09)**<br>
+usando [Claude Code](https://claude.com/claude-code) con Opus 5.5<br>
+para la comunidad latina
 
 </div>
