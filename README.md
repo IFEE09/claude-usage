@@ -29,6 +29,10 @@
 **Claude Usage** te muestra en todo momento cuánto llevas usado, sin tener que abrir
 claude.ai → Ajustes → Uso cada rato.
 
+<div align="center">
+<img src="docs/captura.png" width="346" alt="Panel de Claude Usage con la sesión actual al 17 % y el límite semanal al 3 %">
+</div>
+
 ## ✨ Qué hace
 
 | Característica | Descripción |
