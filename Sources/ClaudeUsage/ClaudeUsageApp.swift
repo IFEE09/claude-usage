@@ -8,7 +8,11 @@ struct ClaudeUsageApp: App {
         MenuBarExtra {
             MenuView(store: store)
         } label: {
-            Text("\(Image(systemName: "gauge.with.dots.needle.50percent")) \(store.menuBarText)")
+            // La barra de menús no dibuja un Image metido dentro de un Text; van por separado.
+            HStack(spacing: 4) {
+                Image(systemName: "gauge.with.dots.needle.50percent")
+                Text(store.menuBarText)
+            }
         }
         .menuBarExtraStyle(.window)
     }
