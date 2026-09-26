@@ -13,5 +13,7 @@ La primera vez: clic derecho → **Abrir** (la app no está firmada por Apple).
 ## Cómo funciona
 
 - Inicias sesión en claude.ai dentro de la app; la sesión se guarda como en un navegador.
-- Cada 5 minutos (y al abrir el menú) consulta el endpoint interno que usa la página de uso.
+- Consulta el endpoint interno que usa la página de uso: cada minuto mientras el uso cambia,
+  espaciando hasta cada 5 minutos si no cambia, al abrir el menú, al despertar el Mac
+  y justo después de que se reinicia un límite.
 - Ese endpoint no es oficial: si Anthropic lo cambia, hay que ajustar `UsageStore.swift`.

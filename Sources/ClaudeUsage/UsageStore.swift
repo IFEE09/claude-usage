@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import ServiceManagement
 
 struct UsageLimit: Identifiable {
@@ -25,17 +25,30 @@ final class UsageStore: ObservableObject {
 
     private let client = ClaudeClient()
     private var timer: Timer?
+    private var wakeObserver: NSObjectProtocol?
     private var isRefreshing = false
+    /// Intervalo actual del refresco adaptativo.
+    private var interval = UsageStore.minInterval
     private lazy var loginWindow = LoginWindowController { [weak self] in
         Task { await self?.refresh() }
     }
 
-    private static let refreshInterval: TimeInterval = 5 * 60
+    /// Mientras el uso cambia se consulta cada minuto; si no cambia, el intervalo
+    /// se duplica hasta llegar a 5 minutos.
+    private static let minInterval: TimeInterval = 60
+    private static let maxInterval: TimeInterval = 5 * 60
     private static let orgKey = "selectedOrganizationUUID"
 
     init() {
-        timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
-            Task { await self?.refresh() }
+        // Al despertar el Mac, actualizar en cuanto vuelva la red.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                self?.interval = UsageStore.minInterval
+                await self?.refresh()
+            }
         }
         Task { await refresh() }
     }
@@ -70,8 +83,12 @@ final class UsageStore: ObservableObject {
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer {
+            isRefreshing = false
+            scheduleNextRefresh()
+        }
         status = .loading
+        let previous = Dictionary(uniqueKeysWithValues: limits.map { ($0.id, $0.percent) })
 
         do {
             guard await ClaudeClient.hasSessionCookie() else { throw ClaudeError.notLoggedIn }
@@ -87,6 +104,10 @@ final class UsageStore: ObservableObject {
                 if parsed.isEmpty { continue }
 
                 UserDefaults.standard.set(uuid, forKey: Self.orgKey)
+                let current = Dictionary(uniqueKeysWithValues: parsed.map { ($0.id, $0.percent) })
+                interval = current == previous
+                    ? min(interval * 2, Self.maxInterval)
+                    : Self.minInterval
                 limits = parsed
                 orgName = org["name"] as? String
                 lastUpdated = Date()
@@ -97,8 +118,23 @@ final class UsageStore: ObservableObject {
         } catch ClaudeError.notLoggedIn {
             limits = []
             status = .loggedOut
+            interval = Self.maxInterval
         } catch {
             status = .error(error.localizedDescription)
+            interval = Self.maxInterval
+        }
+    }
+
+    /// Programa la siguiente consulta. Si algún límite se reinicia antes, consulta justo después.
+    private func scheduleNextRefresh() {
+        var delay = interval
+        let nextReset = limits.compactMap(\.resetsAt).filter { $0 > Date() }.min()
+        if let nextReset {
+            delay = min(delay, nextReset.timeIntervalSinceNow + 5)
+        }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: max(delay, 10), repeats: false) { [weak self] _ in
+            Task { await self?.refresh() }
         }
     }
 
